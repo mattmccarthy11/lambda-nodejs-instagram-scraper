@@ -1,14 +1,24 @@
 'use strict';
 
-module.exports.hello = async (event, context) => {
-  return {
-    statusCode: 200,
-    body: JSON.stringify({
-      message: 'Go Serverless v1.0! Your function executed successfully!',
-      input: event,
-    }),
-  };
+const https = require('https');
 
-  // Use this code if you don't use the http event with the LAMBDA-PROXY integration
-  // return { message: 'Go Serverless v1.0! Your function executed successfully!', event };
+module.exports.hello = function(event, context) {
+  var url = "https://ifconfig.me";
+  https.get(url, (resp) => {
+    let data = '';
+
+    // Continuously update stream with data
+    resp.on('data', (chunk) => {
+      // A chunk of data has been recieved.
+      data += chunk;
+    });
+
+    // The whole response has been received. Print out the result.
+    resp.on('end', () => {
+      context.succeed(data);
+    });
+
+  }).on("error", (err) => {
+    context.fail("Error: " + err.message);
+  });
 };
