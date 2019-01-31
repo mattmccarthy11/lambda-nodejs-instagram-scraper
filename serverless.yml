@@ -21,6 +21,7 @@ provider:
 package:
   exclude:
     - nbproject/**
+    - .test/**
 #    - exclude-me.js
 #    - exclude-me-dir/**
 #  include:

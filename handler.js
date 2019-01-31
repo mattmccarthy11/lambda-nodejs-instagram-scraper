@@ -1,19 +1,14 @@
 'use strict';
+
+const https = require('https');
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0'
 /*
 curl 'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables=%7B%22id%22%3A%22186622962%22%2C%22first%22%3A12%2C%22after%22%3A%22QVFBUVp1SERFVzlhWmt1Zm1qaE1MVmhJQUhwMEpjVmlOV2ZSVEFkYVIxRlc1VkNzaGlLQjJpdjEtVmZzaWpNTllHd0YwaVFsMEVYTXY0aHFvbElWR21uVg%3D%3D%22%7D' \
 -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0' \
 -H 'X-Instagram-GIS: b3550d664610fbe827b515a2bba1edcc'
 //*///
-const https = require('https');
 //'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='
 //'https://www.instagram.com/graphql/query/?query_hash=42323d64886122307be10013ad2dcc44&variables='
-const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0'
-
-const OPT_HEADERS = {
-  headers: {
-    'User-Agent': USER_AGENT
-  }
-};
 
 module.exports.stats = (event, context, callback) => {
   const username = event.queryStringParameters.user;
@@ -82,10 +77,11 @@ const getMediasByUserId = (userData, call__back) => {
     let data = '';
     resp.on('data', chunk => data += chunk);
     resp.on('end', () => {
-  console.log(resp.statusCode);//resp.headers
+      data = JSON.parse(data);
+      console.log('http end:'+resp.statusCode );//resp.headers
       call__back(null, {
         statusCode: 200,
-        body:  data
+        body:  JSON.stringify({...userData, ...data.data.user.edge_owner_to_timeline_media})
       });
     });
   }).on("error", (err) => {
