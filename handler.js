@@ -1,12 +1,13 @@
 'use strict';
-
+/*
+curl 'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables=%7B%22id%22%3A%22186622962%22%2C%22first%22%3A12%2C%22after%22%3A%22QVFBUVp1SERFVzlhWmt1Zm1qaE1MVmhJQUhwMEpjVmlOV2ZSVEFkYVIxRlc1VkNzaGlLQjJpdjEtVmZzaWpNTllHd0YwaVFsMEVYTXY0aHFvbElWR21uVg%3D%3D%22%7D' \
+-H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0' \
+-H 'X-Instagram-GIS: b3550d664610fbe827b515a2bba1edcc'
+//*///
 const https = require('https');
-const ACCOUNT_MEDIAS = 'https://www.instagram.com/graphql/query/?query_hash=42323d64886122307be10013ad2dcc44&variables=';//{variables}
-//let variables = {id:186622962,first:12,after:"QVFBdlJ0T3JMekRrUlBTcnZrcXlyclQ1WlNnODdaUWJsbUgxR0VuM0E3eG5JOTFGeFNiQ1lSLUdBY2tuSUlyaEdST3haZzV4dnZTYkhqVWFaX2gzX3JnOA=="}
 //'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='
-//+encodeURIComponent(JSON.stringify( variables ) )
+//'https://www.instagram.com/graphql/query/?query_hash=42323d64886122307be10013ad2dcc44&variables='
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0'
-//--compressed -H 'X-Instagram-GIS: 2b17d19bdf3f7c1cc281d64402262bfe' 
 
 const OPT_HEADERS = {
   headers: {
@@ -35,10 +36,11 @@ const userStatsIG =   (username, call_back) => {
     let data = '';
     resp.on('data', chunk => data += chunk);
     resp.on('end', () => {
-      call_back(null, {
-        statusCode: 200,
-        body: JSON.stringify(parse_sharedData(username, scrape(data) ))
-      });
+      getMediasByUserId(parse_sharedData(username, scrape(data) ), call_back);
+//      call_back(null, {
+//        statusCode: 200,
+//        body: JSON.stringify(parse_sharedData(username, scrape(data) ))
+//      });
     });
   }).on("error", (err) => {
     console.log("userStatsIG Err: " + err.message);
@@ -50,7 +52,49 @@ const userStatsIG =   (username, call_back) => {
 };
 
 const getMediasByUserId = (userData, call__back) => {
-  
+  const variables = {
+    id : userData.id,
+    first : 12,
+    after : userData.media_next_page
+  };/*
+  const options = {
+    hostname: 'www.instagram.com',
+    path: '/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='+encodeURIComponent(JSON.stringify( variables ) ),
+    headers: {
+      'User-Agent': USER_AGENT,
+      'X-Instagram-GIS': MD5(userData.rhx_gis + ":" + JSON.stringify( variables ))//+ userData.csrf_token + ":" + USER_AGENT + ":" 
+    }
+  };//*///
+  const baselinevars = {
+    id:"186622962",
+    first:12,
+    after:"QVFBUVp1SERFVzlhWmt1Zm1qaE1MVmhJQUhwMEpjVmlOV2ZSVEFkYVIxRlc1VkNzaGlLQjJpdjEtVmZzaWpNTllHd0YwaVFsMEVYTXY0aHFvbElWR21uVg=="
+  };
+  const options = {
+    hostname: 'www.instagram.com',
+    path: '/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='+encodeURIComponent(JSON.stringify( baselinevars ) ),
+    headers: {
+      'User-Agent': USER_AGENT,
+      'X-Instagram-GIS': MD5("c4e41f3bf08da3b312cdf42578ec7f08:" + JSON.stringify( baselinevars ) )//b3550d664610fbe827b515a2bba1edcc'
+    }
+  };
+  https.get(options, (resp) => {
+    let data = '';
+    resp.on('data', chunk => data += chunk);
+    resp.on('end', () => {
+  console.log(resp.statusCode);//resp.headers
+      call__back(null, {
+        statusCode: 200,
+        body:  data
+      });
+    });
+  }).on("error", (err) => {
+    console.log("userStatsIG Err: " + err.message);
+    call__back(null, {
+      statusCode: 500,
+      body: JSON.stringify(err)
+    });
+  });
 };
 
 const parse_sharedData = (username, _sharedData) => {
@@ -68,6 +112,7 @@ const parse_sharedData = (username, _sharedData) => {
         csrf_token : _sharedData.config.csrf_token,
         rhx_gis : _sharedData.rhx_gis,
         username : username,
+        id : _sharedData.entry_data.ProfilePage[0].graphql.user.id,
         followers : _sharedData.entry_data.ProfilePage[0].graphql.user.edge_followed_by.count,
         total_media_count : _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.count,
         media_next_page : _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.page_info.has_next_page
