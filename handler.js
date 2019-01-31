@@ -1,7 +1,7 @@
 'use strict';
 
 const https = require('https');
-const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0'
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0';
 /* 20190131 seems that rhx_gis paired with user-agent string */
 const RHX_GIS = "c4e41f3bf08da3b312cdf42578ec7f08" ;
 /*
@@ -51,7 +51,7 @@ const userStatsIG =   (username, call_back) => {
 const getMediasByUserId = (userData, call__back) => {
   const variables = {
     id : userData.id,
-    first : 12,
+    first : 50, //max  limited 50 items returned from IG
     after : userData.media_next_page
   };
   const options = {
@@ -67,11 +67,30 @@ const getMediasByUserId = (userData, call__back) => {
     resp.on('data', chunk => jsonr += chunk);
     resp.on('end', () => {
       jsonr = JSON.parse(jsonr);
-      console.log('http end:'+resp.statusCode, userData.rhx_gis, options.headers['X-Instagram-GIS'] );//resp.headers
-      call__back(null, {
-        statusCode: 200,
-        body:  JSON.stringify({...userData, ...jsonr.data.user.edge_owner_to_timeline_media})
-      });
+      let medias = [];
+      const edges =  jsonr.data.user.edge_owner_to_timeline_media.edges;
+      edges.forEach( post => medias.push(scrapePostData(post) ) );
+//      console.log('http end:'+resp.statusCode);//resp.headers, options.headers['X-Instagram-GIS']
+      
+      userData.media_next_page = jsonr.data.user.edge_owner_to_timeline_media.page_info.has_next_page 
+                                                    && jsonr.data.user.edge_owner_to_timeline_media.page_info.end_cursor;
+
+      const {image_count, image_engagemets, video_count, video_engagemets} = parseStatFromMedias(medias);
+      userData.image_count += image_count;
+      userData.image_engagemets += image_engagemets;
+      userData.video_count += video_count;
+      userData.video_engagemets += video_engagemets;
+
+      // approx 10 sec to complete 200 medias
+      if( userData.media_next_page && (userData.image_count+userData.video_count )  < 200 ){
+        console.log('ITERATING');
+        getMediasByUserId(userData, call__back); 
+      }else{
+        call__back(null, {
+          statusCode: 200,
+          body:  JSON.stringify(userData)
+        });
+      }
     });
   }).on("error", (err) => {
     console.log("userStatsIG Err: " + err.message);
@@ -92,7 +111,6 @@ const parse_sharedData = (username, _sharedData) => {
     _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media &&
     _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.count > 0 &&
     _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.edges) {
-      const edges =  _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.edges;
       let userStats = {
         csrf_token : _sharedData.config.csrf_token,
         rhx_gis : _sharedData.rhx_gis,
@@ -104,6 +122,7 @@ const parse_sharedData = (username, _sharedData) => {
                                         && _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.page_info.end_cursor
       };
       let medias = [];
+      const edges =  _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.edges;
       edges.forEach( post => medias.push(scrapePostData(post) ) );
       return {...userStats, ...parseStatFromMedias(medias)};
   }else {
@@ -130,7 +149,7 @@ const scrapePostData = post => {
     shortcode : post.node.shortcode,
     text : post.node.edge_media_to_caption.edges[0] && post.node.edge_media_to_caption.edges[0].node.text,
     comment_count : post.node.edge_media_to_comment.count,
-    like_count : post.node.edge_liked_by.count,
+    like_count : post.node.edge_liked_by && post.node.edge_liked_by.count || post.node.edge_media_preview_like && post.node.edge_media_preview_like.count,
     view_count : post.node.is_video && post.node.video_view_count,
     display_url : post.node.display_url,
     owner_id : post.node.owner.id,
