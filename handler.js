@@ -2,14 +2,16 @@
 
 const https = require('https');
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0'
+/* 20190131 seems that rhx_gis paired with user-agent string */
+const RHX_GIS = "c4e41f3bf08da3b312cdf42578ec7f08" ;
 /*
 curl 'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables=%7B%22id%22%3A%22186622962%22%2C%22first%22%3A12%2C%22after%22%3A%22QVFBUVp1SERFVzlhWmt1Zm1qaE1MVmhJQUhwMEpjVmlOV2ZSVEFkYVIxRlc1VkNzaGlLQjJpdjEtVmZzaWpNTllHd0YwaVFsMEVYTXY0aHFvbElWR21uVg%3D%3D%22%7D' \
 -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0' \
 -H 'X-Instagram-GIS: b3550d664610fbe827b515a2bba1edcc'
-//*///
+rhx_gis	"c4e41f3bf08da3b312cdf42578ec7f08"
 //'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='
 //'https://www.instagram.com/graphql/query/?query_hash=42323d64886122307be10013ad2dcc44&variables='
-
+//*///
 module.exports.stats = (event, context, callback) => {
   const username = event.queryStringParameters.user;
   myIP();
@@ -51,37 +53,24 @@ const getMediasByUserId = (userData, call__back) => {
     id : userData.id,
     first : 12,
     after : userData.media_next_page
-  };/*
-  const options = {
-    hostname: 'www.instagram.com',
-    path: '/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='+encodeURIComponent(JSON.stringify( variables ) ),
-    headers: {
-      'User-Agent': USER_AGENT,
-      'X-Instagram-GIS': MD5(userData.rhx_gis + ":" + JSON.stringify( variables ))//+ userData.csrf_token + ":" + USER_AGENT + ":" 
-    }
-  };//*///
-  const baselinevars = {
-    id:"186622962",
-    first:12,
-    after:"QVFBUVp1SERFVzlhWmt1Zm1qaE1MVmhJQUhwMEpjVmlOV2ZSVEFkYVIxRlc1VkNzaGlLQjJpdjEtVmZzaWpNTllHd0YwaVFsMEVYTXY0aHFvbElWR21uVg=="
   };
   const options = {
     hostname: 'www.instagram.com',
-    path: '/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='+encodeURIComponent(JSON.stringify( baselinevars ) ),
+    path: '/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='+ JSON.stringify( variables ),
     headers: {
       'User-Agent': USER_AGENT,
-      'X-Instagram-GIS': MD5("c4e41f3bf08da3b312cdf42578ec7f08:" + JSON.stringify( baselinevars ) )//b3550d664610fbe827b515a2bba1edcc'
+      'X-Instagram-GIS': MD5(RHX_GIS+":"+ JSON.stringify( variables ) )
     }
   };
   https.get(options, (resp) => {
-    let data = '';
-    resp.on('data', chunk => data += chunk);
+    let jsonr = '';
+    resp.on('data', chunk => jsonr += chunk);
     resp.on('end', () => {
-      data = JSON.parse(data);
-      console.log('http end:'+resp.statusCode );//resp.headers
+      jsonr = JSON.parse(jsonr);
+      console.log('http end:'+resp.statusCode, userData.rhx_gis, options.headers['X-Instagram-GIS'] );//resp.headers
       call__back(null, {
         statusCode: 200,
-        body:  JSON.stringify({...userData, ...data.data.user.edge_owner_to_timeline_media})
+        body:  JSON.stringify({...userData, ...jsonr.data.user.edge_owner_to_timeline_media})
       });
     });
   }).on("error", (err) => {
