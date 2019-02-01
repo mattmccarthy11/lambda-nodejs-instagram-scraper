@@ -14,15 +14,15 @@ rhx_gis	"c4e41f3bf08da3b312cdf42578ec7f08"
 //*///
 module.exports.stats = (event, context, callback) => {
   const username = event.queryStringParameters.user;
-  myIP();
+  myIP(username);
   userStatsIG(username, callback);
 };
 
-const myIP = async () => {
+const myIP = async u => {
   https.get('https://ifconfig.me', (resp) => {
     let data = '';
     resp.on('data', chunk => data += chunk );
-    resp.on('end', () => console.log("myIP:"+data) );
+    resp.on('end', () => console.log('myIP:'+data+':'+u) );
   }).on("error", (err) => {
     console.log("myIP Err: " + err.message);
   });
@@ -33,11 +33,22 @@ const userStatsIG =   (username, call_back) => {
     let data = '';
     resp.on('data', chunk => data += chunk);
     resp.on('end', () => {
-      getMediasByUserId(parse_sharedData(username, scrape(data) ), call_back);
-//      call_back(null, {
-//        statusCode: 200,
-//        body: JSON.stringify(parse_sharedData(username, scrape(data) ))
-//      });
+      if(200===resp.statusCode){
+        const userData = parse_sharedData(username, scrape(data) );
+        if(userData.media_next_page){
+          getMediasByUserId(userData, call_back);
+        }else{
+          call_back(null, {
+            statusCode: resp.statusCode,
+            body: JSON.stringify(userData)
+          });
+        }
+      }else{
+        call_back(null, {
+          statusCode: resp.statusCode,
+          body: resp.statusCode//resp.headers
+        });
+      }
     });
   }).on("error", (err) => {
     console.log("userStatsIG Err: " + err.message);
@@ -51,7 +62,7 @@ const userStatsIG =   (username, call_back) => {
 const getMediasByUserId = (userData, call__back) => {
   const variables = {
     id : userData.id,
-    first : 50, //max  limited 50 items returned from IG
+    first : 50, //20190201 max  limited 50 items returned from IG
     after : userData.media_next_page
   };
   const options = {
@@ -70,7 +81,6 @@ const getMediasByUserId = (userData, call__back) => {
       let medias = [];
       const edges =  jsonr.data.user.edge_owner_to_timeline_media.edges;
       edges.forEach( post => medias.push(scrapePostData(post) ) );
-//      console.log('http end:'+resp.statusCode);//resp.headers, options.headers['X-Instagram-GIS']
       
       userData.media_next_page = jsonr.data.user.edge_owner_to_timeline_media.page_info.has_next_page 
                                                     && jsonr.data.user.edge_owner_to_timeline_media.page_info.end_cursor;
@@ -81,13 +91,13 @@ const getMediasByUserId = (userData, call__back) => {
       userData.video_count += video_count;
       userData.video_engagemets += video_engagemets;
 
-      // approx 10 sec to complete 200 medias
-      if( userData.media_next_page && (userData.image_count+userData.video_count )  < 200 ){
-        console.log('ITERATING');
+      // up to 17 sec to complete 200 medias
+      if( userData.media_next_page && (userData.image_count+userData.video_count )  < 300 ){
+//        console.log('ITERATING:'+userData.username);
         getMediasByUserId(userData, call__back); 
       }else{
         call__back(null, {
-          statusCode: 200,
+          statusCode: resp.statusCode,
           body:  JSON.stringify(userData)
         });
       }
@@ -112,10 +122,12 @@ const parse_sharedData = (username, _sharedData) => {
     _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.count > 0 &&
     _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.edges) {
       let userStats = {
-        csrf_token : _sharedData.config.csrf_token,
-        rhx_gis : _sharedData.rhx_gis,
-        username : username,
+//        csrf_token : _sharedData.config.csrf_token,
+//        rhx_gis : _sharedData.rhx_gis,
         id : _sharedData.entry_data.ProfilePage[0].graphql.user.id,
+        username : username,
+        fullname : _sharedData.entry_data.ProfilePage[0].graphql.user.full_name,
+        propic : _sharedData.entry_data.ProfilePage[0].graphql.user.profile_pic_url_hd || _sharedData.entry_data.ProfilePage[0].graphql.user.profile_pic_url,
         followers : _sharedData.entry_data.ProfilePage[0].graphql.user.edge_followed_by.count,
         total_media_count : _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.count,
         media_next_page : _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.page_info.has_next_page
@@ -151,6 +163,7 @@ const scrapePostData = post => {
     comment_count : post.node.edge_media_to_comment.count,
     like_count : post.node.edge_liked_by && post.node.edge_liked_by.count || post.node.edge_media_preview_like && post.node.edge_media_preview_like.count,
     view_count : post.node.is_video && post.node.video_view_count,
+    is_video : post.node.is_video,
     display_url : post.node.display_url,
     owner_id : post.node.owner.id,
     date : post.node.taken_at_timestamp,
@@ -168,7 +181,7 @@ const parseStatFromMedias = medias => {
   };
   medias.forEach( post => {
     let eng = post.comment_count + post.like_count;
-    if(post.view_count){
+    if(post.is_video){
       stats.video_count++;
       stats.video_engagemets += eng + post.view_count;
     }else{

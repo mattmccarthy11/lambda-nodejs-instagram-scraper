@@ -34,7 +34,7 @@ package:
 functions:
   stats:
     handler: handler.stats
-    timeout: 20 # Timeout in seconds, the default is 6 seconds
+    timeout: 23 # Timeout in seconds, the default is 6 seconds
 #    reservedConcurrency: 44 # Maximum concurrency (parallel executions), the default is 1000
     events:
       - http:
