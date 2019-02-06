@@ -2,31 +2,12 @@
 
 const https = require('https');
 /* 201901 seems that rhx_gis is paired with user-agent string */
-const IGTOKEN = [
-  {
-    rhx_gis : '234b7202a65fa8622a12a313f96f3256',
-    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0'
-  },
-  {
-    rhx_gis : 'c4e41f3bf08da3b312cdf42578ec7f08',
-    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0' /*FF DevEd*/
-  },
-  {
-    rhx_gis : '1fd0f33600d7d33ee91c0f29a48b5144',
-    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'
-  },
-  {
-    rhx_gis : 'e9ed3ea2eb8aedad000d58b794659a85',
-    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.0.2 Safari/605.1.15'
-  }
-];
+const UA1 = (512+Math.floor(Math.random()*10000)/100).toFixed(2);
+const UA2 = (4096-Math.floor(Math.random()*100000)/100).toFixed(2);
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/'+UA1+' (KHTML, like Gecko) Chrome/71.0.'+UA2+' Safari/'+UA1+'';
 /*
-curl 'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables=%7B%22id%22%3A%22186622962%22%2C%22first%22%3A12%2C%22after%22%3A%22QVFBUVp1SERFVzlhWmt1Zm1qaE1MVmhJQUhwMEpjVmlOV2ZSVEFkYVIxRlc1VkNzaGlLQjJpdjEtVmZzaWpNTllHd0YwaVFsMEVYTXY0aHFvbElWR21uVg%3D%3D%22%7D' \
--H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0' \
--H 'X-Instagram-GIS: b3550d664610fbe827b515a2bba1edcc'
-rhx_gis	"c4e41f3bf08da3b312cdf42578ec7f08"
-//'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='
-//'https://www.instagram.com/graphql/query/?query_hash=42323d64886122307be10013ad2dcc44&variables='
+'https://www.instagram.com/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='
+'https://www.instagram.com/graphql/query/?query_hash=42323d64886122307be10013ad2dcc44&variables='
 //*///
 module.exports.stats = (event, context, callback) => {
   const username = event.queryStringParameters.user;
@@ -45,7 +26,14 @@ const myIP = async u => {
 };
 
 const userStatsIG =   (username, call_back) => {
-  https.get(`https://www.instagram.com/${username}/`, (resp) => {
+  const options = {
+    hostname: 'www.instagram.com',
+    path: `/${username}/`,
+    headers: {
+      'User-Agent': USER_AGENT
+    }
+  };
+  https.get(options, (resp) => {
     let data = '';
     resp.on('data', chunk => data += chunk);
     resp.on('end', () => {
@@ -56,7 +44,7 @@ const userStatsIG =   (username, call_back) => {
         }else{
           call_back(null, {
             statusCode: resp.statusCode,
-            body: JSON.stringify(userData)
+            body: JSON.stringify(parseBrandEngagements(userData) )
           });
         }
       }else{
@@ -81,13 +69,13 @@ const getMediasByUserId = (userData, call__back) => {
     first : 50, //20190201 max  limited 50 items returned from IG
     after : userData.media_next_page
   };
-  const keypair = IGTOKEN[Math.floor(Math.random() * IGTOKEN.length ) ];
+//  const keypair = IGTOKEN[Math.floor(Math.random() * IGTOKEN.length ) ];
   const options = {
     hostname: 'www.instagram.com',
     path: '/graphql/query/?query_hash=f2405b236d85e8296cf30347c9f08c2a&variables='+ JSON.stringify( variables ),
     headers: {
-      'User-Agent': keypair.user_agent,
-      'X-Instagram-GIS': MD5(keypair.rhx_gis+":"+ JSON.stringify( variables ) )
+      'User-Agent': USER_AGENT,
+      'X-Instagram-GIS': MD5(userData.rhx_gis+":"+ JSON.stringify( variables ) )
     }
   };
   https.get(options, (resp) => {
@@ -118,13 +106,13 @@ const getMediasByUserId = (userData, call__back) => {
         }else{
           call__back(null, {
             statusCode: resp.statusCode,
-            body:  JSON.stringify(userData)
+            body:  JSON.stringify(parseBrandEngagements(userData) )
           });
         }
       }else{
         call__back(null, {
           statusCode: resp.statusCode,
-          body: JSON.stringify(userData)//resp.headers
+          body: JSON.stringify(parseBrandEngagements(userData) )//resp.headers
         });
       }
     });
@@ -149,7 +137,7 @@ const parse_sharedData = (username, _sharedData) => {
     _sharedData.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.edges) {
       let userStats = {
 //        csrf_token : _sharedData.config.csrf_token,
-//        rhx_gis : _sharedData.rhx_gis,
+        rhx_gis : _sharedData.rhx_gis, // this token pairs with https module's agent
         id : _sharedData.entry_data.ProfilePage[0].graphql.user.id,
         username : username,
         fullname : _sharedData.entry_data.ProfilePage[0].graphql.user.full_name,
@@ -220,6 +208,14 @@ const parseStatFromMedias = medias => {
     }
   });
   return stats;
+};
+
+const parseBrandEngagements = d => {
+  d.brand_post_count = d.brand_post_engagements.length;
+  d.brand_post_engagements = d.brand_post_engagements.reduce( (a,b)=> a+b );
+  d.brand_video_count = d.brand_video_engagements.length;
+  d.brand_video_engagements = d.brand_video_engagements.reduce( (a,b)=> a+b );
+  return d;
 };
 
 //https://stackoverflow.com/questions/14733374/how-to-generate-md5-file-hash-on-javascript/33486055#33486055
