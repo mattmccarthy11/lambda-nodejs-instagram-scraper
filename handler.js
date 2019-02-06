@@ -48,6 +48,7 @@ const userStatsIG =   (username, call_back) => {
           });
         }
       }else{
+        console.log('IGERR01:'+resp.statusCode+':'+username);
         call_back(null, {
           statusCode: resp.statusCode,
           body: JSON.stringify(username)//resp.headers
@@ -110,6 +111,7 @@ const getMediasByUserId = (userData, call__back) => {
           });
         }
       }else{
+        console.log('IGERR02:'+resp.statusCode, JSON.stringify(userData) );
         call__back(null, {
           statusCode: resp.statusCode,
           body: JSON.stringify(parseBrandEngagements(userData) )//resp.headers
@@ -212,9 +214,9 @@ const parseStatFromMedias = medias => {
 
 const parseBrandEngagements = d => {
   d.brand_post_count = d.brand_post_engagements.length;
-  d.brand_post_engagements = d.brand_post_engagements.reduce( (a,b)=> a+b );
+  d.brand_post_engagements = d.brand_post_engagements.reduce( (a,b)=> a+b, 0 );
   d.brand_video_count = d.brand_video_engagements.length;
-  d.brand_video_engagements = d.brand_video_engagements.reduce( (a,b)=> a+b );
+  d.brand_video_engagements = d.brand_video_engagements.reduce( (a,b)=> a+b, 0 );
   return d;
 };
 
